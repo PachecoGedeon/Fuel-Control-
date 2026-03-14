@@ -1,0 +1,244 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (uid)
+    // Fields:
+    //   - uid: string (required, immutable) - User's unique ID
+    //   - email: string (required) - User's email
+    //   - displayName: string (optional) - User's name
+    //   - createdAt: string (optional, immutable) - ISO date string
+    //
+    // Collection: fuelLogs
+    // Document ID: logId
+    // Fields:
+    //   - userId: string (required, immutable) - Owner's UID
+    //   - odometer: number (required) - Reading in km
+    //   - fuelAmount: number (required) - Liters
+    //   - totalCost: number (required) - Currency value
+    //   - date: string (required, immutable) - ISO date string
+    //   - location: string (optional) - Station name/location
+    //
+    // Collection: maintenanceLogs
+    // Document ID: logId
+    // Fields:
+    //   - userId: string (required, immutable) - Owner's UID
+    //   - vehicleId: string (required, immutable) - Vehicle's ID
+    //   - date: string (required) - ISO date string
+    //   - description: string (required) - Service description
+    //   - mechanicName: string (optional) - Mechanic/Shop name
+    //   - cost: number (optional) - Service cost
+    //   - odometer: number (optional) - Odometer reading
+    //   - fileUrl: string (optional) - PDF URL
+    //   - fileName: string (optional) - Original file name
+    //
+    // Collection: parkingLogs
+    // Document ID: logId
+    // Fields:
+    //   - userId: string (required, immutable) - Owner's UID
+    //   - vehicleId: string (required, immutable) - Vehicle's ID
+    //   - entryOdometer: number (required) - Start km
+    //   - exitOdometer: number (optional) - End km
+    //   - entryDate: string (required) - ISO date string
+    //   - exitDate: string (optional) - ISO date string
+    //   - locationName: string (optional) - Parking name
+    //   - status: string (required) - active, completed
+    //
+    // Collection: vehicles
+    // Document ID: vehicleId
+    // Fields:
+    //   - userId: string (required, immutable) - Owner's UID
+    //   - type: string (required) - e.g., Carro, Moto
+    //   - model: string (required) - Vehicle model
+    //   - year: number (required) - Manufacture year
+    //   - fuelType: string (required) - Álcool, Gasolina, Flex
+    //
+    // Collection: partners
+    // Document ID: partnerId
+    // Fields:
+    //   - name: string (required)
+    //   - category: string (required)
+    //   - logoUrl: string (required)
+    //   - description: string (required)
+    //   - rating: number (required)
+    //   - websiteUrl: string (required)
+    //
+    // Collection: coupons
+    // Document ID: couponId
+    // Fields:
+    //   - partnerId: string (required)
+    //   - title: string (required)
+    //   - code: string (required)
+    //   - discount: string (required)
+    //   - expiryDate: string (optional)
+    //   - imageUrl: string (optional)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "gdnpchc1978@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'createdAt', 'isPremium']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50)) &&
+             (!('isPremium' in data) || data.isPremium is bool);
+    }
+
+    function isValidFuelLog(data) {
+      return hasOnlyAllowedFields(['userId', 'odometer', 'fuelAmount', 'totalCost', 'date', 'location']) &&
+             data.userId == request.auth.uid &&
+             data.odometer is number && data.odometer >= 0 &&
+             data.fuelAmount is number && data.fuelAmount > 0 &&
+             data.totalCost is number && data.totalCost >= 0 &&
+             data.date is string && data.date.size() <= 50 &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 200));
+    }
+
+    function isValidVehicle(data) {
+      return hasOnlyAllowedFields(['userId', 'type', 'model', 'year', 'fuelType']) &&
+             data.userId == request.auth.uid &&
+             data.type is string && data.type.size() <= 50 &&
+             data.model is string && data.model.size() <= 100 &&
+             data.year is number && data.year > 1900 && data.year < 2100 &&
+             data.fuelType in ['Álcool', 'Gasolina', 'Flex'];
+    }
+
+    function isValidPartner(data) {
+      return hasOnlyAllowedFields(['name', 'category', 'logoUrl', 'description', 'rating', 'websiteUrl']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.logoUrl is string && isValidUrl(data.logoUrl) &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+             data.websiteUrl is string && isValidUrl(data.websiteUrl);
+    }
+
+    function isValidCoupon(data) {
+      return hasOnlyAllowedFields(['partnerId', 'title', 'code', 'discount', 'expiryDate', 'imageUrl']) &&
+             data.partnerId is string &&
+             data.title is string && data.title.size() <= 100 &&
+             data.code is string && data.code.size() <= 20 &&
+             data.discount is string && data.discount.size() <= 20 &&
+             (!('expiryDate' in data) || (data.expiryDate is string && data.expiryDate.size() <= 50)) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && isValidUrl(data.imageUrl)));
+    }
+
+    function isValidMaintenanceLog(data) {
+      return hasOnlyAllowedFields(['userId', 'vehicleId', 'date', 'description', 'mechanicName', 'cost', 'odometer', 'fileUrl', 'fileName']) &&
+             data.userId == request.auth.uid &&
+             data.vehicleId is string &&
+             data.date is string && data.date.size() <= 50 &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 1000 &&
+             (!('mechanicName' in data) || (data.mechanicName is string && data.mechanicName.size() <= 200)) &&
+             (!('cost' in data) || (data.cost is number && data.cost >= 0)) &&
+             (!('odometer' in data) || (data.odometer is number && data.odometer >= 0)) &&
+             (!('fileUrl' in data) || (data.fileUrl is string && isValidUrl(data.fileUrl))) &&
+             (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 255));
+    }
+
+    function isValidParkingLog(data) {
+      return hasOnlyAllowedFields(['userId', 'vehicleId', 'entryOdometer', 'exitOdometer', 'entryDate', 'exitDate', 'locationName', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.vehicleId is string &&
+             data.entryOdometer is number && data.entryOdometer >= 0 &&
+             (!('exitOdometer' in data) || (data.exitOdometer is number && data.exitOdometer >= data.entryOdometer)) &&
+             data.entryDate is string && data.entryDate.size() <= 50 &&
+             (!('exitDate' in data) || (data.exitDate is string && data.exitDate.size() <= 50)) &&
+             (!('locationName' in data) || (data.locationName is string && data.locationName.size() <= 200)) &&
+             data.status in ['active', 'completed'];
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (!('isPremium' in request.resource.data) || request.resource.data.isPremium == false);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+                      (!('isPremium' in resource.data) || request.resource.data.isPremium == resource.data.isPremium);
+    }
+
+    match /vehicles/{vehicleId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidVehicle(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidVehicle(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /partners/{partnerId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidPartner(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidCoupon(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /fuelLogs/{logId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidFuelLog(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidFuelLog(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.date == resource.data.date;
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /maintenanceLogs/{logId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidMaintenanceLog(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidMaintenanceLog(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.vehicleId == resource.data.vehicleId;
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /parkingLogs/{logId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidParkingLog(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidParkingLog(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.vehicleId == resource.data.vehicleId;
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+  }
+}

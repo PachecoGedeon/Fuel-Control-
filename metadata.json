@@ -1,0 +1,7 @@
+{
+  "name": "FuelControl",
+  "description": "Controle de gastos de combustível, hodômetro e descoberta de postos e auto peças próximos.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

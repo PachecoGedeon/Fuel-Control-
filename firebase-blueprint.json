@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Informações do perfil do usuário.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID único do usuário." },
+        "email": { "type": "string", "description": "E-mail do usuário." },
+        "displayName": { "type": "string", "description": "Nome de exibição." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de criação da conta." },
+        "isPremium": { "type": "boolean", "description": "Status do plano premium." }
+      },
+      "required": ["uid", "email"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Informações do veículo do usuário.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID do proprietário." },
+        "type": { "type": "string", "description": "Tipo do veículo (ex: Carro, Moto)." },
+        "model": { "type": "string", "description": "Modelo do veículo." },
+        "year": { "type": "number", "description": "Ano do veículo." },
+        "fuelType": { "type": "string", "enum": ["Álcool", "Gasolina", "Flex"], "description": "Tipo de combustível." }
+      },
+      "required": ["userId", "type", "model", "year", "fuelType"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Empresa parceira do aplicativo.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "rating": { "type": "number" },
+        "websiteUrl": { "type": "string" }
+      },
+      "required": ["name", "category", "logoUrl", "description", "rating", "websiteUrl"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Cupom de desconto de um parceiro.",
+      "type": "object",
+      "properties": {
+        "partnerId": { "type": "string" },
+        "title": { "type": "string" },
+        "code": { "type": "string" },
+        "discount": { "type": "string" },
+        "expiryDate": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["partnerId", "title", "code", "discount"]
+    },
+    "FuelLog": {
+      "title": "FuelLog",
+      "description": "Registro de abastecimento de combustível.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID do usuário que fez o registro." },
+        "odometer": { "type": "number", "description": "Leitura do hodômetro em km." },
+        "fuelAmount": { "type": "number", "description": "Quantidade de combustível em litros." },
+        "totalCost": { "type": "number", "description": "Valor total pago pelo abastecimento." },
+        "date": { "type": "string", "format": "date-time", "description": "Data do abastecimento." },
+        "location": { "type": "string", "description": "Localização ou nome do posto." }
+      },
+      "required": ["userId", "odometer", "fuelAmount", "totalCost", "date"]
+    },
+    "MaintenanceLog": {
+      "title": "MaintenanceLog",
+      "description": "Registro de manutenção do veículo com anexo PDF.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID do proprietário." },
+        "vehicleId": { "type": "string", "description": "ID do veículo relacionado." },
+        "date": { "type": "string", "format": "date-time", "description": "Data da manutenção." },
+        "description": { "type": "string", "description": "Descrição do serviço realizado." },
+        "mechanicName": { "type": "string", "description": "Nome do mecânico ou oficina." },
+        "cost": { "type": "number", "description": "Custo da manutenção." },
+        "odometer": { "type": "number", "description": "Quilometragem no momento do serviço." },
+        "fileUrl": { "type": "string", "description": "URL do arquivo PDF no Firebase Storage." },
+        "fileName": { "type": "string", "description": "Nome do arquivo original." }
+      },
+      "required": ["userId", "vehicleId", "date", "description"]
+    },
+    "ParkingLog": {
+      "title": "ParkingLog",
+      "description": "Registro de quilometragem ao deixar o carro em estacionamento.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID do proprietário." },
+        "vehicleId": { "type": "string", "description": "ID do veículo." },
+        "entryOdometer": { "type": "number", "description": "Quilometragem na entrada." },
+        "exitOdometer": { "type": "number", "description": "Quilometragem na saída." },
+        "entryDate": { "type": "string", "format": "date-time", "description": "Data e hora da entrada." },
+        "exitDate": { "type": "string", "format": "date-time", "description": "Data e hora da saída." },
+        "locationName": { "type": "string", "description": "Nome do estacionamento ou local." },
+        "status": { "type": "string", "enum": ["active", "completed"], "description": "Status do registro." }
+      },
+      "required": ["userId", "vehicleId", "entryOdometer", "entryDate", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Documento de perfil do usuário."
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "Vehicle",
+      "description": "Coleção de veículos do usuário."
+    },
+    "/partners/{partnerId}": {
+      "schema": "Partner",
+      "description": "Lista de parceiros (postos, oficinas, etc)."
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Cupons de desconto oferecidos por parceiros."
+    },
+    "/fuelLogs/{logId}": {
+      "schema": "FuelLog",
+      "description": "Coleção de registros de combustível."
+    },
+    "/maintenanceLogs/{logId}": {
+      "schema": "MaintenanceLog",
+      "description": "Coleção de registros de manutenção e arquivos PDF."
+    },
+    "/parkingLogs/{logId}": {
+      "schema": "ParkingLog",
+      "description": "Coleção de registros de estacionamento para controle de quilometragem."
+    }
+  }
+}
